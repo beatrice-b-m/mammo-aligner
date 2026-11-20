@@ -179,3 +179,36 @@ def test_from_metadata_reads_multiframe_functional_groups():
         ],
     }
     assert Alignment.from_metadata(record) == Alignment(Edge.RIGHT, Edge.TOP)
+
+
+def test_from_metadata_derives_orientation_from_image_orientation_patient():
+    # Shape of a GE Senographe Pristina DBT header (right CC): no Patient Orientation anywhere,
+    # only direction cosines and laterality in the shared functional group.
+    record = {
+        "SharedFunctionalGroupsSequence": [
+            {
+                "FrameAnatomySequence": [{"FrameLaterality": "R"}],
+                "PlaneOrientationSequence": [{"ImageOrientationPatient": [0, 1, 0, 1, 0, -0.0]}],
+            }
+        ],
+    }
+    assert Alignment.from_metadata(record) == Alignment.from_orientation(["P", "L"], "R")
+
+
+@pytest.mark.parametrize(
+    "cosines, expected",
+    [
+        ([0, 1, 0, 1, 0, 0], ("P", "L")),
+        ([0, -1, 0, -1, 0, 0], ("A", "R")),
+        ([0, 1, 0, 0.6, 0, -0.8], ("P", "F")),  # oblique (MLO-like): the larger component wins
+        ("[0, 1, 0, 1, 0, 0]", ("P", "L")),
+        ([0, 0, 0, 1, 0, 0], ("", "L")),  # not a direction
+        ([1, 0, 0], ("", "")),
+        (None, ("", "")),
+    ],
+)
+def test_direction_cosines_to_patient_orientation(cosines, expected):
+    from mg_aligner.metadata import PatientOrientation
+
+    parsed = PatientOrientation.from_cosines(cosines)
+    assert (parsed.row, parsed.column) == expected

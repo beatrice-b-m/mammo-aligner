@@ -68,25 +68,59 @@ class PatientOrientation:
 
         if isinstance(value, cls):
             return value
-        if isinstance(value, str):
-            text = value.strip()
-            if text.startswith(("[", "(")):
-                try:
-                    value = ast.literal_eval(text)
-                except (SyntaxError, ValueError):
-                    value = None
-            else:
-                value = text.split("\\")
         try:
-            row, column = value
+            row, column = _values(value)
         except (TypeError, ValueError):
             row = column = None
         return cls(_component(row), _component(column))
+
+    @classmethod
+    def from_cosines(cls, value: Any) -> "PatientOrientation":
+        """Derive the principal directions from DICOM Image Orientation (Patient).
+
+        ``value`` holds six direction cosines in the patient coordinate system
+        (+X patient left, +Y posterior, +Z head): three for +x, then three for
+        +y. Each axis is labelled by its largest component, which is all
+        alignment needs.
+        """
+
+        try:
+            cosines = [float(v) for v in _values(value)]
+        except (TypeError, ValueError):
+            cosines = []
+        if len(cosines) != 6:
+            return cls("", "")
+        return cls(_principal_letter(cosines[:3]), _principal_letter(cosines[3:]))
+
+
+def _values(value: Any) -> Any:
+    """Turn ``"A\\B"`` or ``"['A', 'B']"`` into a sequence; pass sequences through."""
+
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if text.startswith(("[", "(")):
+        try:
+            return ast.literal_eval(text)
+        except (SyntaxError, ValueError):
+            return None
+    return text.split("\\")
 
 
 def _component(value: Any) -> str:
     text = _normalized_text(value)
     return text if re.fullmatch(r"[APRLHF]{1,3}", text) else ""
+
+
+_AXIS_LETTERS = (("L", "R"), ("P", "A"), ("H", "F"))  # (+, -) along patient X, Y, Z
+
+
+def _principal_letter(vector: list) -> str:
+    axis = max(range(3), key=lambda i: abs(vector[i]))
+    if abs(vector[axis]) < 0.5:  # not a unit direction
+        return ""
+    positive, negative = _AXIS_LETTERS[axis]
+    return positive if vector[axis] > 0 else negative
 
 
 class Manufacturer(_CoercibleEnum):
