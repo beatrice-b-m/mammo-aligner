@@ -1,0 +1,18 @@
+[project]
+name = "mg-aligner"
+version = "0.1.0"
+description = "Check and realign the orientation of mammography images and coordinates."
+authors = [
+    { name = "Beatrice Brown-Mulry", email = "bbrownmulry@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
