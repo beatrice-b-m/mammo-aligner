@@ -13,8 +13,67 @@ It is built primarily for the [Emory Breast Imaging Dataset
 (EMBED)](https://github.com/Emory-HITI/EMBED_Open_Data), and aims to support
 synthetic 2D, FFDM, and DBT images from multiple manufacturers.
 
-> **Status:** early development. The public API is not yet stable; installation
-> and usage examples will be added here once it is.
+> **Status:** early development; the API may still change.
+
+## Installation
+
+```bash
+uv add git+<repository-url>
+```
+
+The library has no runtime dependencies. Images are expected to be NumPy-style
+arrays.
+
+## Usage
+
+An `Alignment` records which image edge holds the **chest wall** and which holds
+the **superior** side of the breast (the lateral side for CC views). The
+reference alignment is chest wall on the left, superior/lateral at the top.
+
+```python
+import pydicom
+from mg_aligner import Alignment
+
+ds = pydicom.dcmread("image.dcm")
+alignment = Alignment.from_metadata(ds)   # also accepts a dict or pandas row
+
+alignment.is_known       # False if the metadata does not determine it
+alignment.is_reference   # True if no flip is needed
+
+image = alignment.realign_image(ds.pixel_array)
+box = alignment.realign_box(roi, height=ds.Rows, width=ds.Columns)
+```
+
+### Constructors
+
+| Method | Uses |
+| --- | --- |
+| `Alignment.from_metadata(record)` | Patient Orientation, falling back to Field of View attributes. Reads `ImageLateralityFinal` (EMBED), `ImageLaterality`, or `Laterality`. |
+| `Alignment.from_orientation(orientation, laterality, view)` | DICOM Patient Orientation, e.g. `["P", "L"]`, `"P\\L"`, or `"['P', 'L']"`. |
+| `Alignment.from_fov(rotation, horizontal_flip, laterality)` | DICOM Field of View Rotation (0 or 180) and Horizontal Flip. |
+| `Alignment(chest_wall, superior)` | Explicit edges, e.g. `Alignment("right", "top")`. |
+
+Missing or malformed metadata gives an unknown alignment rather than an error.
+
+### Realignment
+
+`realign_image`, `realign_point`, `realign_box`, and `realign_boxes` flip into
+the reference alignment, or into any `target=` alignment, so the same calls map
+results back into the original frame:
+
+```python
+original = Alignment.reference().realign_box(box, height=h, width=w, target=alignment)
+```
+
+- Images: the last two axes are (rows, columns), so 2D images and DBT volumes
+  shaped (frames, rows, columns) both work. Frame indices are unchanged.
+- Coordinates are inclusive pixel indices: points are `(y, x)` and boxes are
+  `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
+- Only flips are supported. Realigning an unknown alignment raises `ValueError`;
+  a rotated one (chest wall at the top or bottom) raises `NotImplementedError`.
+
+See [`examples/realign_synthetic.py`](examples/realign_synthetic.py) for a
+runnable walk-through.
 
 ## Development
 
