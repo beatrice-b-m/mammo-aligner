@@ -75,6 +75,21 @@ original = Alignment.reference().realign_box(box, height=h, width=w, target=alig
 See [`examples/realign_synthetic.py`](examples/realign_synthetic.py) for a
 runnable walk-through.
 
+## Validation
+
+[`validation/embed_metadata.py`](validation/embed_metadata.py) checks the two
+metadata routes against each other on an EMBED image-metadata CSV
+(`metadata_all_cohorts_v1c`). For each 2D, 3D, and C-View image, it infers the
+alignment from Patient Orientation and from the Field of View attributes, then
+reports agreement by manufacturer, model, image type, and view. It also lists
+the input values behind any disagreement or unknown result. Output is
+aggregate counts only.
+
+```bash
+uv run --group validation python validation/embed_metadata.py \
+    path/to/metadata_all_cohorts_v1c.csv --out validation_results/
+```
+
 ## Development
 
 The project uses [`uv`](https://docs.astral.sh/uv/).
