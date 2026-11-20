@@ -18,5 +18,9 @@ dev = [
     "pytest>=9.2.0",
 ]
 validation = [
+    "ipykernel>=7.3.0",
+    "matplotlib>=3.10.9",
     "pandas>=2.3.3",
+    "pydicom>=3",
+    "pylibjpeg[all]>=2.1.0",
 ]

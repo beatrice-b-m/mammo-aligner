@@ -96,6 +96,14 @@ uv run --group validation python validation/embed_metadata.py \
     path/to/metadata_all_cohorts_v1c.csv --out validation_results/
 ```
 
+[`validation/visual_spot_check.ipynb`](validation/visual_spot_check.ipynb)
+checks the pixels themselves. It samples a few images at random from each
+manufacturer, image type, and view, and shows each one as stored, marking the
+edges the metadata claims, next to its realigned version with the ROI boxes.
+Set the paths in its first code cell, then run it with the `validation`
+environment (`uv sync --group validation`). Its outputs contain patient
+images, so clear them before committing.
+
 ## Development
 
 The project uses [`uv`](https://docs.astral.sh/uv/).
