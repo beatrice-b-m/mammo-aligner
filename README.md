@@ -21,6 +21,12 @@ synthetic 2D, FFDM, and DBT images from multiple manufacturers.
 uv add git+https://github.com/beatrice-b-m/mg-aligner.git
 ```
 
+or with pip:
+
+```bash
+pip install git+https://github.com/beatrice-b-m/mg-aligner.git
+```
+
 The library has no runtime dependencies. Images are expected to be NumPy-style
 arrays.
 
@@ -49,8 +55,8 @@ box = alignment.realign_box(roi, height=ds.Rows, width=ds.Columns)
 | Method | Uses |
 | --- | --- |
 | `Alignment.from_metadata(record)` | Patient Orientation, falling back to Field of View attributes. Reads `ImageLateralityFinal` (EMBED), `ImageLaterality`, or `Laterality`. |
-| `Alignment.from_orientation(orientation, laterality, view)` | DICOM Patient Orientation, e.g. `["P", "L"]`, `"P\\L"`, or `"['P', 'L']"`. |
-| `Alignment.from_fov(rotation, horizontal_flip, laterality)` | DICOM Field of View Rotation (0 or 180) and Horizontal Flip. |
+| `Alignment.from_orientation(orientation, laterality)` | DICOM Patient Orientation, e.g. `["P", "L"]`, `"P\\L"`, or `"['P', 'L']"`, read by each value's principal (first) letter. Laterality is only needed for plain L/R values (CC-type views). |
+| `Alignment.from_fov(rotation, horizontal_flip, laterality, view_position, manufacturer)` | DICOM Field of View Rotation (0 or 180) and Horizontal Flip. These describe the image relative to the detector, so the result is corrected for the vendor (GE detectors are rotated 180° relative to Hologic) and for reverse views (LM, LMO, LMID, FB, SIO). Unvalidated manufacturers and views give an unknown alignment. |
 | `Alignment(chest_wall, superior)` | Explicit edges, e.g. `Alignment("right", "top")`. |
 
 Missing or malformed metadata gives an unknown alignment rather than an error.
@@ -89,6 +95,14 @@ aggregate counts only.
 uv run --group validation python validation/embed_metadata.py \
     path/to/metadata_all_cohorts_v1c.csv --out validation_results/
 ```
+
+[`validation/visual_spot_check.ipynb`](validation/visual_spot_check.ipynb)
+checks the pixels themselves. It samples a few images at random from each
+manufacturer, image type, and view, and shows each one as stored, marking the
+edges the metadata claims, next to its realigned version with the ROI boxes.
+Set the paths in its first code cell, then run it with the `validation`
+environment (`uv sync --group validation`). Its outputs contain patient
+images, so clear them before committing.
 
 ## Development
 

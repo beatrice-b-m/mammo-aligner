@@ -11,9 +11,9 @@ from mg_aligner.metadata import (
     FovHorizontalFlip,
     FovRotation,
     Laterality,
-    OrientationDirection,
+    Manufacturer,
     PatientOrientation,
-    ViewPosition,
+    ProjectionSide,
 )
 
 Point = Tuple[float, float]
@@ -39,8 +39,8 @@ class Alignment:
     """Where the anatomy of a mammogram sits in its pixel array.
 
     ``chest_wall`` is the image edge holding the chest wall. ``superior`` is the
-    image edge holding the superior side of the breast; for CC views, which
-    have no superior/inferior axis, it holds the lateral side instead.
+    image edge holding the superior side of the breast; for CC-type views,
+    which have no superior/inferior axis, it holds the lateral side instead.
 
     The reference alignment is chest wall on the left and superior (lateral for
     CC) at the top. Realignment only flips; rotated alignments are recognised
@@ -70,16 +70,21 @@ class Alignment:
         return cls(Edge.UNKNOWN, Edge.UNKNOWN)
 
     @classmethod
-    def from_orientation(cls, orientation: Any, laterality: Any, view_position: Any) -> "Alignment":
-        """Infer alignment from DICOM Patient Orientation, image laterality, and view."""
+    def from_orientation(cls, orientation: Any, laterality: Any = None) -> "Alignment":
+        """Infer alignment from DICOM Patient Orientation and image laterality.
+
+        Each orientation value is read by its principal (first) letter: A/P
+        locate the chest wall and H/F the superior side. Laterality is only
+        needed when a value is plain L/R (CC-type views), to tell lateral
+        from medial.
+        """
 
         parsed = PatientOrientation.coerce(orientation)
         side = Laterality.coerce(laterality)
-        view = ViewPosition.coerce(view_position)
 
         edges = {}
-        for axis, direction in (("x", parsed.row), ("y", parsed.column)):
-            anatomy = _anatomy(direction, side, view)
+        for axis, component in (("x", parsed.row), ("y", parsed.column)):
+            anatomy = _anatomy(component, side)
             if anatomy is None:
                 continue
             field, edge = _EDGE_TOWARD[axis, anatomy]
@@ -89,8 +94,23 @@ class Alignment:
         return cls(edges.get("chest_wall", Edge.UNKNOWN), edges.get("superior", Edge.UNKNOWN))
 
     @classmethod
-    def from_fov(cls, rotation: Any, horizontal_flip: Any, laterality: Any) -> "Alignment":
-        """Infer alignment from DICOM Field of View Rotation and Horizontal Flip."""
+    def from_fov(
+        cls,
+        rotation: Any,
+        horizontal_flip: Any,
+        laterality: Any,
+        view_position: Any,
+        manufacturer: Any,
+    ) -> "Alignment":
+        """Infer alignment from DICOM Field of View Rotation and Horizontal Flip.
+
+        Field of View values describe the image relative to the detector, so
+        the result depends on the vendor's detector frame and on which side
+        of the breast the view is taken from. Only Hologic and GE, and views
+        checked against Patient Orientation, are supported; anything else
+        gives an unknown alignment. Prefer :meth:`from_orientation` when
+        Patient Orientation is available.
+        """
 
         key = (
             Laterality.coerce(laterality),
@@ -98,7 +118,17 @@ class Alignment:
             FovHorizontalFlip.coerce(horizontal_flip),
         )
         edges = _FOV_ALIGNMENT.get(key)
-        return cls(*edges) if edges else cls.unknown()
+        vendor = Manufacturer.coerce(manufacturer)
+        side = ProjectionSide.coerce(view_position)
+        if not edges or vendor is Manufacturer.UNKNOWN or side is ProjectionSide.UNKNOWN:
+            return cls.unknown()
+
+        chest_wall, superior = edges
+        if vendor is Manufacturer.GE:  # detector frame is rotated 180° relative to Hologic
+            chest_wall, superior = _OPPOSITE[chest_wall], _OPPOSITE[superior]
+        if side is ProjectionSide.REVERSE:  # detector on the other side mirrors top to bottom
+            superior = _OPPOSITE[superior]
+        return cls(chest_wall, superior)
 
     @classmethod
     def from_metadata(cls, record: Any) -> "Alignment":
@@ -110,17 +140,15 @@ class Alignment:
         """
 
         laterality = _field(record, "ImageLateralityFinal", "ImageLaterality", "Laterality")
-        alignment = cls.from_orientation(
-            _field(record, "PatientOrientation"),
-            laterality,
-            _field(record, "ViewPosition"),
-        )
+        alignment = cls.from_orientation(_field(record, "PatientOrientation"), laterality)
         if alignment.is_known:
             return alignment
         return cls.from_fov(
             _field(record, "FieldOfViewRotation"),
             _field(record, "FieldOfViewHorizontalFlip"),
             laterality,
+            _field(record, "ViewPosition"),
+            _field(record, "Manufacturer"),
         )
 
     # Checks -----------------------------------------------------------------
@@ -203,26 +231,22 @@ _EDGE_TOWARD = {
 }
 
 
-def _anatomy(direction: OrientationDirection, side: Laterality, view: ViewPosition) -> Optional[str]:
+def _anatomy(component: str, side: Laterality) -> Optional[str]:
     """Map an orientation component to anterior/posterior/superior/inferior.
 
-    For CC views lateral counts as superior and medial as inferior.
+    Uses the principal (first) letter. Plain L/R counts as superior when it
+    points lateral and inferior when it points medial (the CC-type convention).
     """
 
-    if direction is OrientationDirection.A:
-        return "anterior"
-    if direction is OrientationDirection.P:
-        return "posterior"
-    if view in {ViewPosition.ML, ViewPosition.LM}:
-        return {"H": "superior", "F": "inferior"}.get(direction.value)
-    if side is Laterality.UNKNOWN:
-        return None
-    lateral, medial = ("L", "R") if side is Laterality.LEFT else ("R", "L")
-    if view in {ViewPosition.CC, ViewPosition.XCCL}:
-        return {lateral: "superior", medial: "inferior"}.get(direction.value)
-    if view is ViewPosition.MLO:
-        return {"H" + lateral: "superior", "F" + medial: "inferior"}.get(direction.value)
+    principal = component[:1]
+    if principal in _PRINCIPAL:
+        return _PRINCIPAL[principal]
+    if principal in ("L", "R") and side is not Laterality.UNKNOWN:
+        return "superior" if principal == side.value else "inferior"
     return None
+
+
+_PRINCIPAL = {"A": "anterior", "P": "posterior", "H": "superior", "F": "inferior"}
 
 
 # Field of View ---------------------------------------------------------------
@@ -231,6 +255,9 @@ _L, _R = Laterality.LEFT, Laterality.RIGHT
 _ROT0, _ROT180 = FovRotation.NONE, FovRotation.FULL
 _FLIP, _NOFLIP = FovHorizontalFlip.YES, FovHorizontalFlip.NO
 
+_OPPOSITE = {Edge.LEFT: Edge.RIGHT, Edge.RIGHT: Edge.LEFT, Edge.TOP: Edge.BOTTOM, Edge.BOTTOM: Edge.TOP}
+
+# Alignment for Hologic standard views; from_fov adjusts it for GE and reverse views.
 _FOV_ALIGNMENT = {
     (_L, _ROT180, _FLIP): (Edge.RIGHT, Edge.TOP),
     (_L, _ROT180, _NOFLIP): (Edge.LEFT, Edge.TOP),
