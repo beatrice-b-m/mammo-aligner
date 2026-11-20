@@ -63,20 +63,29 @@ Missing or malformed metadata gives an unknown alignment rather than an error.
 
 ### Realignment
 
-`realign_image`, `realign_point`, `realign_box`, and `realign_boxes` flip into
-the reference alignment, or into any `target=` alignment, so the same calls map
-results back into the original frame:
+`realign_image`, `realign_point`, `realign_box`, and `realign_boxes` move an
+image or coordinates into the reference alignment, or into any `target=`
+alignment, so the same calls map results back into the original frame. The
+`height` and `width` passed are always those of the image the coordinates are
+on:
 
 ```python
-original = Alignment.reference().realign_box(box, height=h, width=w, target=alignment)
+h, w = image.shape[-2:]
+aligned = alignment.realign_image(image)
+aligned_box = alignment.realign_box(box, height=h, width=w)
+original_box = Alignment.reference().realign_box(
+    aligned_box, height=aligned.shape[-2], width=aligned.shape[-1], target=alignment
+)
 ```
 
 - Images: the last two axes are (rows, columns), so 2D images and DBT volumes
   shaped (frames, rows, columns) both work. Frame indices are unchanged.
 - Coordinates are inclusive pixel indices: points are `(y, x)` and boxes are
   `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
-- Only flips are supported. Realigning an unknown alignment raises `ValueError`;
-  a rotated one (chest wall at the top or bottom) raises `NotImplementedError`.
+- Most images only need flips. An image stored a quarter turn from the target
+  (chest wall at the top or bottom) is also transposed, which swaps its rows and
+  columns, so the realigned image has shape (..., columns, rows).
+- Realigning an unknown alignment raises `ValueError`.
 
 See [`examples/realign_synthetic.py`](examples/realign_synthetic.py) for a
 runnable walk-through.

@@ -43,5 +43,6 @@ y0, x0, y1, x1 = aligned_roi
 assert (aligned[y0 : y1 + 1, x0 : x1 + 1] == 9).all()
 
 # Map back into the original frame, e.g. to write predictions next to the DICOM.
-restored = Alignment.reference().realign_box(aligned_roi, height=height, width=width, target=alignment)
+aligned_height, aligned_width = aligned.shape  # differs from the original only for rotated images
+restored = Alignment.reference().realign_box(aligned_roi, height=aligned_height, width=aligned_width, target=alignment)
 print("ROI mapped back:", restored)

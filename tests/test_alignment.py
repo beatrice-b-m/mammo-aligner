@@ -5,11 +5,14 @@ import pytest
 
 from mg_aligner import Alignment, Edge
 
-FLIPPABLE = [Alignment(c, s) for c, s in itertools.product([Edge.LEFT, Edge.RIGHT], [Edge.TOP, Edge.BOTTOM])]
+HORIZONTAL, VERTICAL = [Edge.LEFT, Edge.RIGHT], [Edge.TOP, Edge.BOTTOM]
+ALL = [Alignment(c, s) for c, s in itertools.product(HORIZONTAL, VERTICAL)] + [
+    Alignment(c, s) for c, s in itertools.product(VERTICAL, HORIZONTAL)  # rotated a quarter turn
+]
 
 
-@pytest.mark.parametrize("source", FLIPPABLE)
-@pytest.mark.parametrize("target", FLIPPABLE)
+@pytest.mark.parametrize("source", ALL)
+@pytest.mark.parametrize("target", ALL)
 def test_coordinates_follow_the_pixels_they_mark(source, target):
     image = np.arange(4 * 5).reshape(4, 5)
     box = (1, 0, 2, 3)  # inclusive (y_min, x_min, y_max, x_max)
@@ -23,16 +26,17 @@ def test_coordinates_follow_the_pixels_they_mark(source, target):
     assert flipped[y, x] == image[1, 0]
 
 
-@pytest.mark.parametrize("source", FLIPPABLE)
+@pytest.mark.parametrize("source", ALL)
 def test_round_trip_restores_the_original(source):
     image = np.arange(3 * 4 * 5).reshape(3, 4, 5)  # DBT-shaped: (frames, rows, columns)
     reference = Alignment.reference()
-    restored = reference.realign_image(source.realign_image(image), target=source)
-    assert np.array_equal(restored, image)
+    realigned = source.realign_image(image)
+    assert np.array_equal(reference.realign_image(realigned, target=source), image)
 
-    box = (0, 0, 3, 4)
+    box = (0, 1, 2, 4)
     there = source.realign_box(box, height=4, width=5)
-    assert reference.realign_box(there, height=4, width=5, target=source) == box
+    height, width = realigned.shape[-2:]  # swapped when source is rotated
+    assert reference.realign_box(there, height=height, width=width, target=source) == box
 
 
 def test_realigning_unknown_raises():
@@ -42,9 +46,29 @@ def test_realigning_unknown_raises():
         Alignment.reference().realign_image(np.zeros((2, 2)), target=Alignment.unknown())
 
 
-def test_realigning_rotated_raises():
-    with pytest.raises(NotImplementedError):
-        Alignment(Edge.TOP, Edge.LEFT).realign_image(np.zeros((2, 2)))
+def _edge_pixels(image, edge):
+    # Interior of an edge, leaving out the corners it shares with the perpendicular edges.
+    return {
+        Edge.LEFT: image[1:-1, 0], Edge.RIGHT: image[1:-1, -1],
+        Edge.TOP: image[0, 1:-1], Edge.BOTTOM: image[-1, 1:-1],
+    }[edge]
+
+
+@pytest.mark.parametrize("source", ALL)
+@pytest.mark.parametrize("target", ALL)
+def test_anatomy_lands_on_the_target_edges(source, target):
+    image = np.zeros((5, 7), dtype=int)
+    _edge_pixels(image, source.chest_wall)[:] = 1
+    _edge_pixels(image, source.superior)[:] = 2
+
+    realigned = source.realign_image(image, target)
+    assert (_edge_pixels(realigned, target.chest_wall) == 1).all()
+    assert (_edge_pixels(realigned, target.superior) == 2).all()
+
+
+def test_quarter_turn_swaps_the_image_shape():
+    image = np.zeros((3, 4, 5))  # DBT-shaped
+    assert Alignment(Edge.BOTTOM, Edge.RIGHT).realign_image(image).shape == (3, 5, 4)
 
 
 def test_edges_must_be_on_different_axes():

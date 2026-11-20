@@ -1,4 +1,4 @@
-"""Image alignment of mammograms and flip-only realignment of images and coordinates."""
+"""Image alignment of mammograms and realignment of images and coordinates."""
 
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ class Edge(Enum):
 
 _HORIZONTAL = {Edge.LEFT, Edge.RIGHT}
 _VERTICAL = {Edge.TOP, Edge.BOTTOM}
+_TRANSPOSED = {Edge.LEFT: Edge.TOP, Edge.TOP: Edge.LEFT, Edge.RIGHT: Edge.BOTTOM, Edge.BOTTOM: Edge.RIGHT}
 
 
 @dataclass(frozen=True)
@@ -43,8 +44,8 @@ class Alignment:
     which have no superior/inferior axis, it holds the lateral side instead.
 
     The reference alignment is chest wall on the left and superior (lateral for
-    CC) at the top. Realignment only flips; rotated alignments are recognised
-    but cannot be realigned.
+    CC) at the top. Realignment flips, and transposes when the source and
+    target differ by a quarter turn (chest wall on a top or bottom edge).
     """
 
     chest_wall: Edge
@@ -181,13 +182,17 @@ class Alignment:
     # Realignment ------------------------------------------------------------
 
     def realign_image(self, image: Any, target: Optional["Alignment"] = None) -> Any:
-        """Flip an array whose last two axes are (rows, columns) into ``target``.
+        """Realign an array whose last two axes are (rows, columns) into ``target``.
 
         Works on 2D images and on DBT volumes shaped (frames, rows, columns).
-        ``target`` defaults to the reference alignment.
+        ``target`` defaults to the reference alignment. When the source and
+        target differ by a quarter turn, rows and columns are swapped, so the
+        result has shape (..., columns, rows).
         """
 
-        flip_x, flip_y = self._flips(target)
+        transpose, flip_x, flip_y = self._transform(target)
+        if transpose:
+            image = image.swapaxes(-1, -2)
         if flip_x:
             image = image[..., ::-1]
         if flip_y:
@@ -195,10 +200,12 @@ class Alignment:
         return image
 
     def realign_point(self, point: Point, *, height: int, width: int, target: Optional["Alignment"] = None) -> Point:
-        """Flip a ``(y, x)`` pixel index into ``target``."""
+        """Realign a ``(y, x)`` pixel index of a ``height`` x ``width`` image into ``target``."""
 
-        flip_x, flip_y = self._flips(target)
+        transpose, flip_x, flip_y = self._transform(target)
         y, x = point
+        if transpose:
+            y, x, height, width = x, y, width, height
         if flip_x:
             x = width - 1 - x
         if flip_y:
@@ -206,10 +213,16 @@ class Alignment:
         return y, x
 
     def realign_box(self, box: Box, *, height: int, width: int, target: Optional["Alignment"] = None) -> Box:
-        """Flip an inclusive ``(y_min, x_min, y_max, x_max)`` pixel box into ``target``."""
+        """Realign an inclusive ``(y_min, x_min, y_max, x_max)`` pixel box into ``target``.
 
-        flip_x, flip_y = self._flips(target)
+        ``height`` and ``width`` are the source image's dimensions.
+        """
+
+        transpose, flip_x, flip_y = self._transform(target)
         y_min, x_min, y_max, x_max = box
+        if transpose:
+            y_min, x_min, y_max, x_max = x_min, y_min, x_max, y_max
+            height, width = width, height
         if flip_x:
             x_min, x_max = width - 1 - x_max, width - 1 - x_min
         if flip_y:
@@ -219,18 +232,31 @@ class Alignment:
     def realign_boxes(
         self, boxes: Iterable[Box], *, height: int, width: int, target: Optional["Alignment"] = None
     ) -> List[Box]:
-        """Flip several boxes; see :meth:`realign_box`."""
+        """Realign several boxes; see :meth:`realign_box`."""
 
         return [self.realign_box(box, height=height, width=width, target=target) for box in boxes]
 
-    def _flips(self, target: Optional["Alignment"]) -> Tuple[bool, bool]:
+    def _transform(self, target: Optional["Alignment"]) -> Tuple[bool, bool, bool]:
+        """Return (transpose, flip_x, flip_y), applied in that order, taking ``self`` to ``target``."""
+
         target = target or self.reference()
         for alignment in (self, target):
             if not alignment.is_known:
                 raise ValueError(f"Cannot realign with an unknown alignment: {alignment}")
-            if alignment.chest_wall not in _HORIZONTAL:
-                raise NotImplementedError(f"Rotated alignments are not supported: {alignment}")
-        return self.chest_wall is not target.chest_wall, self.superior is not target.superior
+
+        source = self
+        transpose = (self.chest_wall in _HORIZONTAL) is not (target.chest_wall in _HORIZONTAL)
+        if transpose:  # swapping rows and columns moves each edge to its diagonal partner
+            source = Alignment(_TRANSPOSED[self.chest_wall], _TRANSPOSED[self.superior])
+
+        flip_x = flip_y = False
+        for have, want in ((source.chest_wall, target.chest_wall), (source.superior, target.superior)):
+            if have is not want:
+                if have in _HORIZONTAL:
+                    flip_x = True
+                else:
+                    flip_y = True
+        return transpose, flip_x, flip_y
 
 
 # Patient Orientation ---------------------------------------------------------
