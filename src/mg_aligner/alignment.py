@@ -139,7 +139,9 @@ class Alignment:
         then ``ImageLaterality``, then ``Laterality``. Multi-frame objects such
         as DBT keep Patient Orientation and laterality per frame, so when the
         top-level attributes are missing they are read from the first
-        shared or per-frame functional group.
+        shared or per-frame functional group. If no Patient Orientation exists
+        at all (e.g. GE Pristina DBT), it is derived from Image Orientation
+        (Patient), at the top level or in the Plane Orientation functional group.
         """
 
         laterality = _field(record, "ImageLateralityFinal", "ImageLaterality", "Laterality")
@@ -148,6 +150,12 @@ class Alignment:
         orientation = _field(record, "PatientOrientation")
         if orientation is None:
             orientation = _frame_field(record, "PatientOrientationInFrameSequence", "PatientOrientation")
+        if orientation is None:
+            cosines = _field(record, "ImageOrientationPatient")
+            if cosines is None:
+                cosines = _frame_field(record, "PlaneOrientationSequence", "ImageOrientationPatient")
+            if cosines is not None:
+                orientation = PatientOrientation.from_cosines(cosines)
 
         alignment = cls.from_orientation(orientation, laterality)
         if alignment.is_known:
