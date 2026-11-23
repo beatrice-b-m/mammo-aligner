@@ -28,9 +28,6 @@ or, with uv:
 uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
 ```
 
-v0.1.0 was published as `mg-aligner` (`import mg_aligner`); the API is otherwise
-unchanged.
-
 ## Quick start
 
 `Alignment.from_metadata` takes a pydicom `Dataset`, a dict, or a pandas row
