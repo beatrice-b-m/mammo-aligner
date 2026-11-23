@@ -1,6 +1,6 @@
 [project]
 name = "mammo-aligner"
-version = "0.2.0"
+version = "0.3.0"
 description = "Check and realign the orientation of mammography images and coordinates."
 authors = [
     { name = "Beatrice Brown-Mulry", email = "bbrownmulry@gmail.com" }
