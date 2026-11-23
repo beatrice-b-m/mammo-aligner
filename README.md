@@ -21,13 +21,13 @@ Pure Python with no runtime dependencies; images are NumPy arrays.
 ## Installation
 
 ```bash
-pip install "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
+pip install "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.3.0"
 ```
 
 or, with uv:
 
 ```bash
-uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
+uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.3.0"
 ```
 
 ## Quick start
