@@ -183,16 +183,16 @@ uv run --group validation python validation/embed_metadata.py path/to/metadata.c
 If you use `mammo-aligner` in your research, please cite the version you used.
 Each release has its own DOI on Zenodo; [10.5281/zenodo.24472822](https://doi.org/10.5281/zenodo.24472822)
 always resolves to the latest. GitHub's **Cite this repository** button (from
-[`CITATION.cff`](CITATION.cff)) gives APA and BibTeX; for v0.2.0:
+[`CITATION.cff`](CITATION.cff)) gives APA and BibTeX; for v0.3.0:
 
 ```bibtex
 @software{brownmulry_mammo_aligner,
   author  = {Brown-Mulry, Beatrice},
   title   = {mammo-aligner},
-  version = {0.2.0},
+  version = {0.3.0},
   year    = {2026},
-  doi     = {10.5281/zenodo.24472823},
-  url     = {https://doi.org/10.5281/zenodo.24472823}
+  doi     = {10.5281/zenodo.24479184},
+  url     = {https://doi.org/10.5281/zenodo.24479184}
 }
 ```
 
