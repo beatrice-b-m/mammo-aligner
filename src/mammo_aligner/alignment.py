@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple
 
-from mg_aligner.metadata import (
+from mammo_aligner.metadata import (
     FovHorizontalFlip,
     FovRotation,
     Laterality,

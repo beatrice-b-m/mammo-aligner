@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 import pytest
 
-from mg_aligner import Alignment, Edge
+from mammo_aligner import Alignment, Edge
 
 HORIZONTAL, VERTICAL = [Edge.LEFT, Edge.RIGHT], [Edge.TOP, Edge.BOTTOM]
 ALL = [Alignment(c, s) for c, s in itertools.product(HORIZONTAL, VERTICAL)] + [
@@ -232,7 +232,7 @@ def test_from_metadata_derives_orientation_from_image_orientation_patient():
     ],
 )
 def test_direction_cosines_to_patient_orientation(cosines, expected):
-    from mg_aligner.metadata import PatientOrientation
+    from mammo_aligner.metadata import PatientOrientation
 
     parsed = PatientOrientation.from_cosines(cosines)
     assert (parsed.row, parsed.column) == expected

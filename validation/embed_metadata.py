@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from mg_aligner import Alignment, Edge
+from mammo_aligner import Alignment, Edge
 
 INPUTS = [
     "PatientOrientation",

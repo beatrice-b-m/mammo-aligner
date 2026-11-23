@@ -4,7 +4,7 @@ Guidance for agents and contributors working in this repository.
 
 ## Scope
 
-`mg-aligner` is a minimal library for checking the orientation of mammography
+`mammo-aligner` is a minimal library for checking the orientation of mammography
 images and realigning them, and coordinates on them, into a common frame. It
 targets synthetic 2D (S2D), full-field digital mammography (FFDM), and digital
 breast tomosynthesis (DBT) images. Keep it small, clear, and focused on that

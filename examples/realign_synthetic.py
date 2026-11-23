@@ -5,7 +5,7 @@ Run with: uv run python examples/realign_synthetic.py
 
 import numpy as np
 
-from mg_aligner import Alignment
+from mammo_aligner import Alignment
 
 # A tiny 4 x 6 "left CC" image as a scanner might store it: chest wall in the
 # right-hand columns, lateral side at the bottom. Values mark tissue (1) and an
