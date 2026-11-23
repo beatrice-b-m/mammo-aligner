@@ -48,12 +48,11 @@ for _, row in meta.iterrows():
         continue  # the metadata does not determine the orientation
 
     image = load_pixels(row)  # your loader, e.g. pydicom.dcmread(path).pixel_array
-    h, w = image.shape[-2:]
     aligned = alignment.realign_image(image)
 
-    # EMBED stores ROI_coords as a serialized list of boxes
+    # EMBED stores ROI_coords as a serialized list of boxes, in pixel indices
     rois = ast.literal_eval(row["ROI_coords"]) if isinstance(row["ROI_coords"], str) else []
-    aligned_rois = alignment.realign_box(rois, height=h, width=w)
+    aligned_rois = alignment.realign_box(rois, size=image.shape[-2:])
 ```
 
 [`examples/realign_synthetic.py`](examples/realign_synthetic.py) runs the same
@@ -116,19 +115,42 @@ model predictions) is the same call from the reference side:
 
 ```python
 original_box = Alignment.reference().realign_box(
-    aligned_rois[0], height=aligned.shape[-2], width=aligned.shape[-1], target=alignment
+    aligned_rois[0], size=aligned.shape[-2:], target=alignment
 )
 ```
 
-- **Coordinates are `(y, x)`**, i.e. (row, column) inclusive pixel indices.
-  Boxes are `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
+### Coordinate formats
+
+**Coordinates are `(y, x)`**, i.e. (row, column). Boxes are inclusive
+`(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`. The `size`
+argument chooses between two formats. Each is checked, so passing one as the
+other raises `ValueError` instead of giving wrong numbers (only coordinates
+made entirely of 0s and 1s are valid in both):
+
+| `size` | Format | Valid values | A flip maps `v` to |
+| --- | --- | --- | --- |
+| `(height, width)` | Pixel indices, e.g. EMBED `ROI_coords` | Whole numbers from 0 to `height - 1` / `width - 1` (`412.0` is fine) | `n - 1 - v`, for `n` = height or width |
+| `None` (default) | Proportions of the image size, independent of resolution | 0 to 1 | `1 - v` |
+
+```python
+alignment.realign_box((812, 140, 1030, 395), size=image.shape[-2:])  # pixel indices
+alignment.realign_box((0.75, 0.85, 0.80, 0.90))                       # proportions
+```
+
+Proportions measure to **pixel centres**: pixel index `i` on an axis of `n`
+pixels is at `(i + 0.5) / n`. Convert with that formula so both formats agree
+after a flip.
+
+- `size` is always the `(height, width)` of the image the coordinates are
+  currently on, so `image.shape[-2:]` works for 2D images and DBT volumes.
 - `realign_point` and `realign_box` take one point or box, or a sequence of
   them (a list, or an `(N, 2)` / `(N, 4)` array). One item comes back as a
   tuple; a sequence comes back as a list of tuples. An input counts as one
   item when its first element is a number. Items of the wrong length, and
   boxes whose minimum exceeds their maximum, raise `ValueError`.
-- `height` and `width` are always those of the image the coordinates are
-  currently on.
+
+### Images
+
 - The last two image axes are (rows, columns), so 2D images and DBT volumes
   shaped (frames, rows, columns) both work. Frame order is unchanged.
 - An image stored a quarter turn off (chest wall at the top or bottom) is

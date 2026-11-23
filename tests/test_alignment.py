@@ -19,10 +19,10 @@ def test_coordinates_follow_the_pixels_they_mark(source, target):
     marked = image[box[0] : box[2] + 1, box[1] : box[3] + 1]
 
     flipped = source.realign_image(image, target)
-    y0, x0, y1, x1 = source.realign_box(box, height=4, width=5, target=target)
+    y0, x0, y1, x1 = source.realign_box(box, size=(4, 5), target=target)
     assert sorted(flipped[y0 : y1 + 1, x0 : x1 + 1].ravel()) == sorted(marked.ravel())
 
-    y, x = source.realign_point((1, 0), height=4, width=5, target=target)
+    y, x = source.realign_point((1, 0), size=(4, 5), target=target)
     assert flipped[y, x] == image[1, 0]
 
 
@@ -34,30 +34,34 @@ def test_round_trip_restores_the_original(source):
     assert np.array_equal(reference.realign_image(realigned, target=source), image)
 
     box = (0, 1, 2, 4)
-    there = source.realign_box(box, height=4, width=5)
-    height, width = realigned.shape[-2:]  # swapped when source is rotated
-    assert reference.realign_box(there, height=height, width=width, target=source) == box
+    there = source.realign_box(box, size=(4, 5))
+    size = realigned.shape[-2:]  # swapped when source is rotated
+    assert reference.realign_box(there, size=size, target=source) == box
+
+    proportional = (0.1, 0.25, 0.6, 0.9)
+    there = source.realign_box(proportional)
+    assert reference.realign_box(there, target=source) == pytest.approx(proportional)
 
 
 @pytest.mark.parametrize("source", ALL)
 def test_nested_input_matches_one_at_a_time(source):
     boxes = [(1, 0, 2, 3), (0, 0, 1, 1), (2, 2, 3, 4), (0, 1, 0, 1)]  # four boxes, like one box's four values
-    nested = source.realign_box(boxes, height=4, width=5)
-    assert nested == [source.realign_box(b, height=4, width=5) for b in boxes]
-    assert source.realign_box(np.array(boxes), height=4, width=5) == nested
+    nested = source.realign_box(boxes, size=(4, 5))
+    assert nested == [source.realign_box(b, size=(4, 5)) for b in boxes]
+    assert source.realign_box(np.array(boxes), size=(4, 5)) == nested
 
     points = [(1, 0), (3, 4)]
-    assert source.realign_point(points, height=4, width=5) == [
-        source.realign_point(p, height=4, width=5) for p in points
+    assert source.realign_point(points, size=(4, 5)) == [
+        source.realign_point(p, size=(4, 5)) for p in points
     ]
 
 
 def test_single_input_gives_a_tuple_and_nested_input_a_list():
     reference = Alignment.reference()
-    assert reference.realign_box([1, 0, 2, 3], height=4, width=5) == (1, 0, 2, 3)
-    assert reference.realign_box([[1, 0, 2, 3]], height=4, width=5) == [(1, 0, 2, 3)]
-    assert reference.realign_box([], height=4, width=5) == []
-    assert reference.realign_point(np.array([1, 2]), height=4, width=5) == (1, 2)
+    assert reference.realign_box([1, 0, 2, 3], size=(4, 5)) == (1, 0, 2, 3)
+    assert reference.realign_box([[1, 0, 2, 3]], size=(4, 5)) == [(1, 0, 2, 3)]
+    assert reference.realign_box([], size=(4, 5)) == []
+    assert reference.realign_point(np.array([1, 2]), size=(4, 5)) == (1, 2)
 
 
 @pytest.mark.parametrize(
@@ -74,12 +78,53 @@ def test_single_input_gives_a_tuple_and_nested_input_a_list():
 )
 def test_malformed_boxes_raise(box):
     with pytest.raises(ValueError):
-        Alignment.reference().realign_box(box, height=4, width=5)
+        Alignment.reference().realign_box(box, size=(4, 5))
+
+
+@pytest.mark.parametrize("source", ALL)
+@pytest.mark.parametrize("target", ALL)
+def test_proportional_coordinates_follow_pixel_centres(source, target):
+    height, width = 4, 5
+    box = (1, 0, 2, 3)
+    centres = ((box[0] + 0.5) / height, (box[1] + 0.5) / width, (box[2] + 0.5) / height, (box[3] + 0.5) / width)
+
+    y0, x0, y1, x1 = source.realign_box(box, size=(height, width), target=target)
+    height, width = source.realign_image(np.zeros((height, width)), target).shape
+    expected = ((y0 + 0.5) / height, (x0 + 0.5) / width, (y1 + 0.5) / height, (x1 + 0.5) / width)
+    assert source.realign_box(centres, target=target) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("source", ALL)
+def test_proportional_centre_stays_put(source):
+    assert source.realign_point((0.5, 0.5)) == (0.5, 0.5)
+
+
+@pytest.mark.parametrize(
+    "box, size",
+    [
+        ((1, 0, 2, 3), None),  # pixel coordinates passed without a size
+        ((0.1, 0.2, 0.3, 0.4), (4, 5)),  # proportional coordinates passed with a size
+        ((0, 0, 4, 4), (4, 5)),  # y_max past the last row
+        ((-1, 0, 2, 3), (4, 5)),
+        ((0, 0, 1.5, 1), None),
+        ((0, 0, float("nan"), 1), None),
+        ((0, 0, 1, 1), (4,)),  # malformed size
+        ((0, 0, 1, 1), (0, 5)),
+        ((0, 0, 1, 1), (4.5, 5)),
+    ],
+)
+def test_values_outside_the_chosen_format_raise(box, size):
+    with pytest.raises(ValueError):
+        Alignment.reference().realign_box(box, size=size)
+
+
+def test_pixel_values_stored_as_whole_floats_are_accepted():
+    assert Alignment.reference().realign_box((1.0, 0.0, 2.0, 3.0), size=(4, 5)) == (1, 0, 2, 3)
 
 
 def test_malformed_points_raise():
     with pytest.raises(ValueError):
-        Alignment.reference().realign_point((1, 2, 3), height=4, width=5)
+        Alignment.reference().realign_point((1, 2, 3), size=(4, 5))
 
 
 def test_realigning_unknown_raises():

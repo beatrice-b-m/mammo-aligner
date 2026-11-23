@@ -210,38 +210,49 @@ class Alignment:
         return image
 
     def realign_point(
-        self, point: Any, *, height: int, width: int, target: Optional["Alignment"] = None
+        self, point: Any, *, size: Optional[Sequence[int]] = None, target: Optional["Alignment"] = None
     ) -> Union[Point, List[Point]]:
-        """Realign ``(y, x)`` pixel indices of a ``height`` x ``width`` image into ``target``.
+        """Realign ``(y, x)`` points into ``target``.
 
         ``point`` is one ``(y, x)`` pair or a sequence of them (e.g. a list or
         an ``(N, 2)`` array). One pair gives a tuple back; a sequence gives a
-        list of tuples. Raises ``ValueError`` if an item is not two numbers.
+        list of tuples.
+
+        ``size`` selects the coordinate format. ``(height, width)`` of the
+        source image means pixel indices: whole numbers from 0 to
+        ``height - 1`` / ``width - 1``. ``None`` (the default) means
+        proportional coordinates: fractions of the image from 0 to 1, measured
+        to pixel centres, so a flip maps ``v`` to ``1 - v``.
+
+        Raises ``ValueError`` if an item is not two numbers or a value is
+        outside its format's range.
         """
 
-        transform = self._transform(target)
-        return _map_items(point, 2, "point", lambda p: _realign_yx(transform, height, width, *p))
+        transform, extent = self._transform(target), _Extent(size)
+        return _map_items(point, 2, "point", lambda p: extent.realign(transform, *p))
 
     def realign_box(
-        self, box: Any, *, height: int, width: int, target: Optional["Alignment"] = None
+        self, box: Any, *, size: Optional[Sequence[int]] = None, target: Optional["Alignment"] = None
     ) -> Union[Box, List[Box]]:
-        """Realign inclusive ``(y_min, x_min, y_max, x_max)`` pixel boxes into ``target``.
+        """Realign inclusive ``(y_min, x_min, y_max, x_max)`` boxes into ``target``.
 
         ``box`` is one box or a sequence of them (e.g. EMBED ``ROI_coords`` or
         an ``(N, 4)`` array). One box gives a tuple back; a sequence gives a
-        list of tuples. ``height`` and ``width`` are the source image's
-        dimensions. Raises ``ValueError`` if an item is not four numbers or a
-        minimum exceeds its maximum.
+        list of tuples. ``size`` selects pixel or proportional coordinates, as
+        in :meth:`realign_point`.
+
+        Raises ``ValueError`` if an item is not four numbers, a value is
+        outside its format's range, or a minimum exceeds its maximum.
         """
 
-        transform = self._transform(target)
+        transform, extent = self._transform(target), _Extent(size)
 
         def realign(b: Sequence[Any]) -> Box:
             y_min, x_min, y_max, x_max = b
             if y_min > y_max or x_min > x_max:
                 raise ValueError(f"box minimum exceeds its maximum: {tuple(b)!r}")
-            ya, xa = _realign_yx(transform, height, width, y_min, x_min)
-            yb, xb = _realign_yx(transform, height, width, y_max, x_max)
+            ya, xa = extent.realign(transform, y_min, x_min)
+            yb, xb = extent.realign(transform, y_max, x_max)
             return min(ya, yb), min(xa, xb), max(ya, yb), max(xa, xb)
 
         return _map_items(box, 4, "box", realign)
@@ -272,17 +283,49 @@ class Alignment:
 # Coordinates -----------------------------------------------------------------
 
 
-def _realign_yx(transform: Tuple[bool, bool, bool], height: int, width: int, y: Any, x: Any) -> Point:
-    """Apply (transpose, flip_x, flip_y) to one ``(y, x)`` pixel index."""
+class _Extent:
+    """The coordinate format given by ``size``: pixel indices, or proportions if ``None``."""
 
-    transpose, flip_x, flip_y = transform
-    if transpose:
-        y, x, height, width = x, y, width, height
-    if flip_x:
-        x = width - 1 - x
-    if flip_y:
-        y = height - 1 - y
-    return y, x
+    def __init__(self, size: Optional[Sequence[int]]) -> None:
+        self.size = size
+        self.pixel = size is not None
+        if size is None:
+            self.last_y, self.last_x = 1, 1
+            return
+        try:
+            height, width = size
+        except (TypeError, ValueError):
+            raise ValueError(f"size must be (height, width) or None, got {size!r}") from None
+        if not all(isinstance(n, numbers.Integral) and n >= 1 for n in (height, width)):
+            raise ValueError(f"size must be two positive whole numbers, got {size!r}")
+        self.last_y, self.last_x = height - 1, width - 1
+
+    def realign(self, transform: Tuple[bool, bool, bool], y: Any, x: Any) -> Point:
+        """Check one ``(y, x)`` against this format, then apply (transpose, flip_x, flip_y)."""
+
+        for value, last in ((y, self.last_y), (x, self.last_x)):
+            if not 0 <= value <= last or (self.pixel and not float(value).is_integer()):
+                raise ValueError(self._out_of_range((y, x)))
+        last_y, last_x = self.last_y, self.last_x
+        transpose, flip_x, flip_y = transform
+        if transpose:
+            y, x, last_y, last_x = x, y, last_x, last_y
+        if flip_x:
+            x = last_x - x
+        if flip_y:
+            y = last_y - y
+        return y, x
+
+    def _out_of_range(self, yx: Point) -> str:
+        if self.pixel:
+            return (
+                f"pixel coordinates must be whole numbers inside the image (size={tuple(self.size)!r}), "
+                f"got {yx!r}; pass size=None for proportional coordinates"
+            )
+        return (
+            f"proportional coordinates (size=None) must be between 0 and 1, got {yx!r}; "
+            "pass size=(height, width) for pixel coordinates"
+        )
 
 
 def _map_items(value: Any, length: int, kind: str, realign: Callable[[Sequence[Any]], Any]) -> Any:

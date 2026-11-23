@@ -30,9 +30,8 @@ metadata = {
 alignment = Alignment.from_metadata(metadata)
 print("Stored as:", alignment)  # for CC views, "superior" is the lateral side
 
-height, width = image.shape
 aligned = alignment.realign_image(image)
-aligned_roi = alignment.realign_box(roi, height=height, width=width)
+aligned_roi = alignment.realign_box(roi, size=image.shape)
 
 print("Aligned image (chest wall left, lateral top):")
 print(aligned)
@@ -43,7 +42,5 @@ assert (aligned[y0 : y1 + 1, x0 : x1 + 1] == 9).all()
 
 # Map back into the original frame, e.g. to write predictions next to the DICOM.
 # Pass the aligned image's shape: it differs from the original for rotated images.
-restored = Alignment.reference().realign_box(
-    aligned_roi, height=aligned.shape[0], width=aligned.shape[1], target=alignment
-)
+restored = Alignment.reference().realign_box(aligned_roi, size=aligned.shape, target=alignment)
 print("ROI mapped back:", restored)
