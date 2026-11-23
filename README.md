@@ -28,9 +28,6 @@ or, with uv:
 uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
 ```
 
-v0.1.0 was published as `mg-aligner` (`import mg_aligner`); the API is otherwise
-unchanged.
-
 ## Quick start
 
 `Alignment.from_metadata` takes a pydicom `Dataset`, a dict, or a pandas row
@@ -150,6 +147,22 @@ the edges the metadata claims and the ROI boxes.
 
 ```bash
 uv run --group validation python validation/embed_metadata.py path/to/metadata.csv
+```
+
+## Citation
+
+If you use `mammo-aligner` in your research, please cite the version you used.
+GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff))
+gives APA and BibTeX; for example:
+
+```bibtex
+@software{brownmulry_mammo_aligner,
+  author  = {Brown-Mulry, Beatrice},
+  title   = {mammo-aligner},
+  version = {0.2.0},
+  year    = {2026},
+  url     = {https://github.com/beatrice-b-m/mammo-aligner}
+}
 ```
 
 ## License
