@@ -1,0 +1,73 @@
+<svg class="bea" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 500" width="660" height="500" role="img" aria-label="Two stored mammograms realigned into the reference frame. Top: a left CC stored with the chest wall on the right and the lateral side at the bottom is flipped horizontally and vertically. Bottom: a right MLO stored a quarter turn off, with the chest wall at the bottom and the superior side on the left, is transposed and flipped horizontally. In the reference frame the chest wall is on the left and the superior (lateral for CC) side is at the top; the ROI box moves with the image.">
+  <style>
+    .bea text { font-family: Inter, system-ui, sans-serif; fill: #000000; }
+    .bea .t { font-size: 16px; font-weight: 700; }
+    .bea .b { font-size: 13.33px; }
+    .bea .c { font-size: 10.67px; }
+    .bea .e { font-size: 10.67px; font-weight: 600; }
+    .bea .m { font-family: Hack, 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; }
+    .bea .muted { fill: #5f6670; }
+  </style>
+  <defs>
+    <marker id="a-ink" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="#3a414a"/></marker>
+    <clipPath id="mlo-stored"><path d="M80 460C80 380 130 360 165 360C200 360 228 390 228 460Z"/></clipPath>
+    <clipPath id="mlo-ref"><path d="M500 320C580 320 600 370 600 405C600 440 570 468 500 468Z"/></clipPath>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+
+  <!-- Row 1: left CC, flips only ======================================= -->
+  <text class="t" x="160" y="22" text-anchor="middle">Stored: left CC</text>
+  <text class="m muted" x="160" y="40" text-anchor="middle">PatientOrientation P\L</text>
+  <rect x="100" y="60" width="120" height="160" fill="#ffffff" stroke="#3a414a" stroke-width="1.2"/>
+  <path d="M220 72C150 72 120 110 120 140C120 175 150 208 220 208Z" fill="#dfe3e8" stroke="#3a414a" stroke-width="1.2"/>
+  <rect x="180" y="170" width="20" height="20" fill="none" stroke="#000000" stroke-width="1.2"/>
+  <text class="c" x="176" y="184" text-anchor="end">ROI</text>
+  <path d="M220 60V220" stroke="#1071e5" stroke-width="4"/>
+  <path d="M100 220H220" stroke="#e81313" stroke-width="4"/>
+  <text class="e" x="228" y="74">chest wall</text>
+  <text class="e" x="160" y="238" text-anchor="middle">lateral</text>
+
+  <path d="M266 140H486" fill="none" stroke="#3a414a" stroke-width="1.2" marker-end="url(#a-ink)"/>
+  <text class="m" x="376" y="130" text-anchor="middle">realign_image()</text>
+  <text class="c muted" x="376" y="158" text-anchor="middle">flip x, flip y</text>
+
+  <text class="t" x="560" y="22" text-anchor="middle">Reference</text>
+  <text class="m muted" x="560" y="40" text-anchor="middle">Alignment.reference()</text>
+  <rect x="500" y="60" width="120" height="160" fill="#ffffff" stroke="#3a414a" stroke-width="1.2"/>
+  <path d="M500 72C570 72 600 110 600 140C600 175 570 208 500 208Z" fill="#dfe3e8" stroke="#3a414a" stroke-width="1.2"/>
+  <rect x="520" y="90" width="20" height="20" fill="none" stroke="#000000" stroke-width="1.2"/>
+  <text class="c" x="544" y="104">ROI</text>
+  <path d="M500 60V220" stroke="#1071e5" stroke-width="4"/>
+  <path d="M500 60H620" stroke="#e81313" stroke-width="4"/>
+  <text class="e" x="492" y="74" text-anchor="end">chest wall</text>
+  <text class="e" x="560" y="55" text-anchor="middle">lateral</text>
+
+  <!-- Row 2: right MLO stored a quarter turn off ======================== -->
+  <text class="t" x="160" y="280" text-anchor="middle">Stored: right MLO, rotated</text>
+  <text class="m muted" x="160" y="298" text-anchor="middle">PatientOrientation F\P</text>
+  <rect x="80" y="340" width="160" height="120" fill="#ffffff" stroke="#3a414a" stroke-width="1.2"/>
+  <path d="M80 460C80 380 130 360 165 360C200 360 228 390 228 460Z" fill="#dfe3e8" stroke="#3a414a" stroke-width="1.2"/>
+  <path clip-path="url(#mlo-stored)" d="M80 460H170L80 425Z" fill="#b4bcc6" stroke="#3a414a" stroke-width="0.6"/>
+  <rect x="170" y="380" width="20" height="20" fill="none" stroke="#000000" stroke-width="1.2"/>
+  <text class="c" x="166" y="394" text-anchor="end">ROI</text>
+  <path d="M80 460H240" stroke="#1071e5" stroke-width="4"/>
+  <path d="M80 340V460" stroke="#e81313" stroke-width="4"/>
+  <text class="e" x="160" y="478" text-anchor="middle">chest wall</text>
+  <text class="e" x="72" y="354" text-anchor="end">superior</text>
+
+  <path d="M266 400H486" fill="none" stroke="#3a414a" stroke-width="1.2" marker-end="url(#a-ink)"/>
+  <text class="m" x="376" y="390" text-anchor="middle">realign_image()</text>
+  <text class="c muted" x="376" y="418" text-anchor="middle">transpose (rows ↔ columns), flip x</text>
+
+  <text class="t" x="560" y="280" text-anchor="middle">Reference</text>
+  <text class="c muted" x="560" y="298" text-anchor="middle">rows and columns swapped</text>
+  <rect x="500" y="320" width="120" height="160" fill="#ffffff" stroke="#3a414a" stroke-width="1.2"/>
+  <path d="M500 320C580 320 600 370 600 405C600 440 570 468 500 468Z" fill="#dfe3e8" stroke="#3a414a" stroke-width="1.2"/>
+  <path clip-path="url(#mlo-ref)" d="M500 320V410L535 320Z" fill="#b4bcc6" stroke="#3a414a" stroke-width="0.6"/>
+  <rect x="560" y="410" width="20" height="20" fill="none" stroke="#000000" stroke-width="1.2"/>
+  <text class="c" x="556" y="424" text-anchor="end">ROI</text>
+  <path d="M500 320V480" stroke="#1071e5" stroke-width="4"/>
+  <path d="M500 320H620" stroke="#e81313" stroke-width="4"/>
+  <text class="e" x="492" y="334" text-anchor="end">chest wall</text>
+  <text class="e" x="560" y="315" text-anchor="middle">superior</text>
+</svg>
