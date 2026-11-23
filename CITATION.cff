@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use mammo-aligner in your research, please cite the version you used."
+type: software
+title: "mammo-aligner"
+abstract: >-
+  A minimal Python library that reads the orientation of a mammogram (FFDM,
+  synthetic 2D, or DBT) from its DICOM metadata and realigns the image, and
+  points or boxes on it, into a common frame.
+authors:
+  - family-names: Brown-Mulry
+    given-names: Beatrice
+version: 0.2.0
+date-released: "2026-11-23"
+license: Apache-2.0
+repository-code: "https://github.com/beatrice-b-m/mammo-aligner"
+keywords:
+  - mammography
+  - digital breast tomosynthesis
+  - DICOM
+  - image orientation
+  - medical imaging
