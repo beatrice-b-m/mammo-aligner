@@ -53,7 +53,7 @@ for _, row in meta.iterrows():
 
     # EMBED stores ROI_coords as a serialized list of boxes
     rois = ast.literal_eval(row["ROI_coords"]) if isinstance(row["ROI_coords"], str) else []
-    aligned_rois = alignment.realign_boxes(rois, height=h, width=w)
+    aligned_rois = alignment.realign_box(rois, height=h, width=w)
 ```
 
 [`examples/realign_synthetic.py`](examples/realign_synthetic.py) runs the same
@@ -109,9 +109,9 @@ constructor if you want to bypass the fallback:
 
 ## Realignment
 
-`realign_image`, `realign_point`, `realign_box`, and `realign_boxes` move an
-image or coordinates into the reference frame, or into any other alignment
-passed as `target=`. Mapping results back into the stored frame (for example,
+`realign_image`, `realign_point`, and `realign_box` move an image or
+coordinates into the reference frame, or into any other alignment passed as
+`target=`. Mapping results back into the stored frame (for example,
 model predictions) is the same call from the reference side:
 
 ```python
@@ -122,6 +122,11 @@ original_box = Alignment.reference().realign_box(
 
 - **Coordinates are `(y, x)`**, i.e. (row, column) inclusive pixel indices.
   Boxes are `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
+- `realign_point` and `realign_box` take one point or box, or a sequence of
+  them (a list, or an `(N, 2)` / `(N, 4)` array). One item comes back as a
+  tuple; a sequence comes back as a list of tuples. An input counts as one
+  item when its first element is a number. Items of the wrong length, and
+  boxes whose minimum exceeds their maximum, raise `ValueError`.
 - `height` and `width` are always those of the image the coordinates are
   currently on.
 - The last two image axes are (rows, columns), so 2D images and DBT volumes

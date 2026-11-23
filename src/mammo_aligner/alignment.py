@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
+import numbers
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 from mammo_aligner.metadata import (
     FovHorizontalFlip,
@@ -208,42 +209,42 @@ class Alignment:
             image = image[..., ::-1, :]
         return image
 
-    def realign_point(self, point: Point, *, height: int, width: int, target: Optional["Alignment"] = None) -> Point:
-        """Realign a ``(y, x)`` pixel index of a ``height`` x ``width`` image into ``target``."""
+    def realign_point(
+        self, point: Any, *, height: int, width: int, target: Optional["Alignment"] = None
+    ) -> Union[Point, List[Point]]:
+        """Realign ``(y, x)`` pixel indices of a ``height`` x ``width`` image into ``target``.
 
-        transpose, flip_x, flip_y = self._transform(target)
-        y, x = point
-        if transpose:
-            y, x, height, width = x, y, width, height
-        if flip_x:
-            x = width - 1 - x
-        if flip_y:
-            y = height - 1 - y
-        return y, x
-
-    def realign_box(self, box: Box, *, height: int, width: int, target: Optional["Alignment"] = None) -> Box:
-        """Realign an inclusive ``(y_min, x_min, y_max, x_max)`` pixel box into ``target``.
-
-        ``height`` and ``width`` are the source image's dimensions.
+        ``point`` is one ``(y, x)`` pair or a sequence of them (e.g. a list or
+        an ``(N, 2)`` array). One pair gives a tuple back; a sequence gives a
+        list of tuples. Raises ``ValueError`` if an item is not two numbers.
         """
 
-        transpose, flip_x, flip_y = self._transform(target)
-        y_min, x_min, y_max, x_max = box
-        if transpose:
-            y_min, x_min, y_max, x_max = x_min, y_min, x_max, y_max
-            height, width = width, height
-        if flip_x:
-            x_min, x_max = width - 1 - x_max, width - 1 - x_min
-        if flip_y:
-            y_min, y_max = height - 1 - y_max, height - 1 - y_min
-        return y_min, x_min, y_max, x_max
+        transform = self._transform(target)
+        return _map_items(point, 2, "point", lambda p: _realign_yx(transform, height, width, *p))
 
-    def realign_boxes(
-        self, boxes: Iterable[Box], *, height: int, width: int, target: Optional["Alignment"] = None
-    ) -> List[Box]:
-        """Realign several boxes; see :meth:`realign_box`."""
+    def realign_box(
+        self, box: Any, *, height: int, width: int, target: Optional["Alignment"] = None
+    ) -> Union[Box, List[Box]]:
+        """Realign inclusive ``(y_min, x_min, y_max, x_max)`` pixel boxes into ``target``.
 
-        return [self.realign_box(box, height=height, width=width, target=target) for box in boxes]
+        ``box`` is one box or a sequence of them (e.g. EMBED ``ROI_coords`` or
+        an ``(N, 4)`` array). One box gives a tuple back; a sequence gives a
+        list of tuples. ``height`` and ``width`` are the source image's
+        dimensions. Raises ``ValueError`` if an item is not four numbers or a
+        minimum exceeds its maximum.
+        """
+
+        transform = self._transform(target)
+
+        def realign(b: Sequence[Any]) -> Box:
+            y_min, x_min, y_max, x_max = b
+            if y_min > y_max or x_min > x_max:
+                raise ValueError(f"box minimum exceeds its maximum: {tuple(b)!r}")
+            ya, xa = _realign_yx(transform, height, width, y_min, x_min)
+            yb, xb = _realign_yx(transform, height, width, y_max, x_max)
+            return min(ya, yb), min(xa, xb), max(ya, yb), max(xa, xb)
+
+        return _map_items(box, 4, "box", realign)
 
     def _transform(self, target: Optional["Alignment"]) -> Tuple[bool, bool, bool]:
         """Return (transpose, flip_x, flip_y), applied in that order, taking ``self`` to ``target``."""
@@ -266,6 +267,46 @@ class Alignment:
                 else:
                     flip_y = True
         return transpose, flip_x, flip_y
+
+
+# Coordinates -----------------------------------------------------------------
+
+
+def _realign_yx(transform: Tuple[bool, bool, bool], height: int, width: int, y: Any, x: Any) -> Point:
+    """Apply (transpose, flip_x, flip_y) to one ``(y, x)`` pixel index."""
+
+    transpose, flip_x, flip_y = transform
+    if transpose:
+        y, x, height, width = x, y, width, height
+    if flip_x:
+        x = width - 1 - x
+    if flip_y:
+        y = height - 1 - y
+    return y, x
+
+
+def _map_items(value: Any, length: int, kind: str, realign: Callable[[Sequence[Any]], Any]) -> Any:
+    """Apply ``realign`` to one item, or to each item of a sequence of them.
+
+    ``value`` is one item if its first element is a number, and a sequence of
+    items otherwise. One item gives one result; a sequence gives a list.
+    """
+
+    try:
+        items = list(value)
+    except TypeError:
+        raise ValueError(f"expected a {kind} or a sequence of them, got {value!r}") from None
+    single = bool(items) and isinstance(items[0], numbers.Real)
+    results = []
+    for item in [items] if single else items:
+        try:
+            values = list(item)
+        except TypeError:
+            values = []
+        if len(values) != length or not all(isinstance(v, numbers.Real) for v in values):
+            raise ValueError(f"a {kind} must be {length} numbers, got {item!r}")
+        results.append(realign(values))
+    return results[0] if single else results
 
 
 # Patient Orientation ---------------------------------------------------------

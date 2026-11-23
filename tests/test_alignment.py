@@ -39,6 +39,49 @@ def test_round_trip_restores_the_original(source):
     assert reference.realign_box(there, height=height, width=width, target=source) == box
 
 
+@pytest.mark.parametrize("source", ALL)
+def test_nested_input_matches_one_at_a_time(source):
+    boxes = [(1, 0, 2, 3), (0, 0, 1, 1), (2, 2, 3, 4), (0, 1, 0, 1)]  # four boxes, like one box's four values
+    nested = source.realign_box(boxes, height=4, width=5)
+    assert nested == [source.realign_box(b, height=4, width=5) for b in boxes]
+    assert source.realign_box(np.array(boxes), height=4, width=5) == nested
+
+    points = [(1, 0), (3, 4)]
+    assert source.realign_point(points, height=4, width=5) == [
+        source.realign_point(p, height=4, width=5) for p in points
+    ]
+
+
+def test_single_input_gives_a_tuple_and_nested_input_a_list():
+    reference = Alignment.reference()
+    assert reference.realign_box([1, 0, 2, 3], height=4, width=5) == (1, 0, 2, 3)
+    assert reference.realign_box([[1, 0, 2, 3]], height=4, width=5) == [(1, 0, 2, 3)]
+    assert reference.realign_box([], height=4, width=5) == []
+    assert reference.realign_point(np.array([1, 2]), height=4, width=5) == (1, 2)
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        (1, 0, 2),  # too few values
+        [[1, 0, 2, 3], [1, 0, 2]],  # one malformed box among good ones
+        [[[1, 0, 2, 3]]],  # nested too deep
+        (2, 0, 1, 3),  # y_min > y_max
+        (0, 3, 1, 2),  # x_min > x_max
+        "0123",
+        5,
+    ],
+)
+def test_malformed_boxes_raise(box):
+    with pytest.raises(ValueError):
+        Alignment.reference().realign_box(box, height=4, width=5)
+
+
+def test_malformed_points_raise():
+    with pytest.raises(ValueError):
+        Alignment.reference().realign_point((1, 2, 3), height=4, width=5)
+
+
 def test_realigning_unknown_raises():
     with pytest.raises(ValueError):
         Alignment(Edge.LEFT, Edge.UNKNOWN).realign_image(np.zeros((2, 2)))
