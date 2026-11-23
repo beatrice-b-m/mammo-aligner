@@ -1,4 +1,4 @@
-# mg-aligner
+# mammo-aligner
 
 Read the orientation of a mammogram from its DICOM metadata and realign the
 image, and points or boxes on it, into one common frame.
@@ -6,7 +6,7 @@ image, and points or boxes on it, into one common frame.
 Mammograms from different vendors and pipelines are stored in different
 on-screen orientations: the chest wall may sit on the left or the right, the
 superior edge at the top or the bottom, and some images are stored a quarter
-turn off. `mg-aligner` infers where the anatomy sits from standard DICOM
+turn off. `mammo-aligner` infers where the anatomy sits from standard DICOM
 attributes, then flips (and if needed transposes) the pixels and coordinates so
 the chest wall is on the left and the superior side is at the top. It handles
 FFDM, synthetic 2D (C-View), and DBT, and was built and checked on the [Emory
@@ -19,14 +19,17 @@ Pure Python with no runtime dependencies; images are NumPy arrays.
 ## Installation
 
 ```bash
-pip install "mg-aligner @ git+https://github.com/beatrice-b-m/mg-aligner.git@v0.1.0"
+pip install "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
 ```
 
 or, with uv:
 
 ```bash
-uv add "mg-aligner @ git+https://github.com/beatrice-b-m/mg-aligner.git@v0.1.0"
+uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0.2.0"
 ```
+
+v0.1.0 was published as `mg-aligner` (`import mg_aligner`); the API is otherwise
+unchanged.
 
 ## Quick start
 
@@ -36,7 +39,7 @@ uv add "mg-aligner @ git+https://github.com/beatrice-b-m/mg-aligner.git@v0.1.0"
 ```python
 import ast
 import pandas as pd
-from mg_aligner import Alignment
+from mammo_aligner import Alignment
 
 meta = pd.read_csv("embed_metadata.csv")  # any table with DICOM attributes as columns
 

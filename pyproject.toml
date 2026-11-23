@@ -1,6 +1,6 @@
 [project]
-name = "mg-aligner"
-version = "0.1.0"
+name = "mammo-aligner"
+version = "0.2.0"
 description = "Check and realign the orientation of mammography images and coordinates."
 authors = [
     { name = "Beatrice Brown-Mulry", email = "bbrownmulry@gmail.com" }
@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.urls]
-Repository = "https://github.com/beatrice-b-m/mg-aligner"
+Repository = "https://github.com/beatrice-b-m/mammo-aligner"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
