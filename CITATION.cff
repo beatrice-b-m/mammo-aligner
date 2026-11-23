@@ -9,7 +9,9 @@ abstract: >-
 authors:
   - family-names: Brown-Mulry
     given-names: Beatrice
+    orcid: "https://orcid.org/0009-0003-2835-3852"
 version: 0.2.0
+doi: 10.5281/zenodo.24472822
 date-released: "2026-11-23"
 license: Apache-2.0
 repository-code: "https://github.com/beatrice-b-m/mammo-aligner"

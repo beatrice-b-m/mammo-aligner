@@ -1,5 +1,7 @@
 # mammo-aligner
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24472822.svg)](https://doi.org/10.5281/zenodo.24472822)
+
 Read the orientation of a mammogram from its DICOM metadata and realign the
 image, and points or boxes on it, into one common frame.
 
@@ -152,8 +154,9 @@ uv run --group validation python validation/embed_metadata.py path/to/metadata.c
 ## Citation
 
 If you use `mammo-aligner` in your research, please cite the version you used.
-GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff))
-gives APA and BibTeX; for example:
+Each release has its own DOI on Zenodo; [10.5281/zenodo.24472822](https://doi.org/10.5281/zenodo.24472822)
+always resolves to the latest. GitHub's **Cite this repository** button (from
+[`CITATION.cff`](CITATION.cff)) gives APA and BibTeX; for v0.2.0:
 
 ```bibtex
 @software{brownmulry_mammo_aligner,
@@ -161,7 +164,8 @@ gives APA and BibTeX; for example:
   title   = {mammo-aligner},
   version = {0.2.0},
   year    = {2026},
-  url     = {https://github.com/beatrice-b-m/mammo-aligner}
+  doi     = {10.5281/zenodo.24472823},
+  url     = {https://doi.org/10.5281/zenodo.24472823}
 }
 ```
 
