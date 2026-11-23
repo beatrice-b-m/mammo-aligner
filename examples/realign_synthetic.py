@@ -28,21 +28,22 @@ metadata = {
 }
 
 alignment = Alignment.from_metadata(metadata)
-print("Detected:", alignment)
-print("Already in reference frame?", alignment.is_reference)
+print("Stored as:", alignment)  # for CC views, "superior" is the lateral side
 
 height, width = image.shape
 aligned = alignment.realign_image(image)
 aligned_roi = alignment.realign_box(roi, height=height, width=width)
 
-print("\nAligned image (chest wall left, lateral top):")
+print("Aligned image (chest wall left, lateral top):")
 print(aligned)
-print("ROI before:", roi, "-> after:", aligned_roi)
+print("ROI:", roi, "->", aligned_roi)
 
 y0, x0, y1, x1 = aligned_roi
 assert (aligned[y0 : y1 + 1, x0 : x1 + 1] == 9).all()
 
 # Map back into the original frame, e.g. to write predictions next to the DICOM.
-aligned_height, aligned_width = aligned.shape  # differs from the original only for rotated images
-restored = Alignment.reference().realign_box(aligned_roi, height=aligned_height, width=aligned_width, target=alignment)
+# Pass the aligned image's shape: it differs from the original for rotated images.
+restored = Alignment.reference().realign_box(
+    aligned_roi, height=aligned.shape[0], width=aligned.shape[1], target=alignment
+)
 print("ROI mapped back:", restored)
