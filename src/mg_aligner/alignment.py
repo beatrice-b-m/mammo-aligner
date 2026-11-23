@@ -56,7 +56,10 @@ class Alignment:
         object.__setattr__(self, "superior", Edge(self.superior))
         for axis in (_HORIZONTAL, _VERTICAL):
             if self.chest_wall in axis and self.superior in axis:
-                raise ValueError(f"chest_wall and superior must be on different axes: {self}")
+                raise ValueError(f"chest_wall and superior must be on different axes: {self!r}")
+
+    def __str__(self) -> str:
+        return f"chest wall {self.chest_wall.value}, superior {self.superior.value}"
 
     # Construction -----------------------------------------------------------
 
@@ -68,6 +71,8 @@ class Alignment:
 
     @classmethod
     def unknown(cls) -> "Alignment":
+        """An alignment the metadata does not determine; it cannot be realigned."""
+
         return cls(Edge.UNKNOWN, Edge.UNKNOWN)
 
     @classmethod
@@ -173,10 +178,14 @@ class Alignment:
 
     @property
     def is_known(self) -> bool:
+        """Whether both edges are known, so the alignment can be realigned."""
+
         return Edge.UNKNOWN not in (self.chest_wall, self.superior)
 
     @property
     def is_reference(self) -> bool:
+        """Whether this is already the reference alignment, so realignment is a no-op."""
+
         return self == self.reference()
 
     # Realignment ------------------------------------------------------------

@@ -1,123 +1,154 @@
 # mg-aligner
 
-A minimal Python library for checking the orientation of mammography images and
-realigning them, and the coordinates on them, into a common frame.
+Read the orientation of a mammogram from its DICOM metadata and realign the
+image, and points or boxes on it, into one common frame.
 
-Mammograms from different vendors and pipelines are stored with different
-on-screen orientations: the chest wall may sit on the left or the right, and the
-superior edge may be at the top or the bottom. `mg-aligner` works out an image's
-orientation from its metadata and flips the image, points, or bounding boxes into
-a single reference frame (or any other frame you choose).
+Mammograms from different vendors and pipelines are stored in different
+on-screen orientations: the chest wall may sit on the left or the right, the
+superior edge at the top or the bottom, and some images are stored a quarter
+turn off. `mg-aligner` infers where the anatomy sits from standard DICOM
+attributes, then flips (and if needed transposes) the pixels and coordinates so
+the chest wall is on the left and the superior side is at the top. It handles
+FFDM, synthetic 2D (C-View), and DBT, and was built and checked on the [Emory
+Breast Imaging Dataset (EMBED)](https://github.com/Emory-HITI/EMBED_Open_Data).
 
-It is built primarily for the [Emory Breast Imaging Dataset
-(EMBED)](https://github.com/Emory-HITI/EMBED_Open_Data), and aims to support
-synthetic 2D, FFDM, and DBT images from multiple manufacturers.
+![A left CC stored with the chest wall on the right is flipped in x and y; a right MLO stored a quarter turn off is transposed and flipped in x. Both end with the chest wall on the left and superior (lateral for CC) at the top, and the ROI box moves with the image.](docs/realignment.svg)
 
-> **Status:** early development; the API may still change.
+Pure Python with no runtime dependencies; images are NumPy arrays.
 
 ## Installation
 
 ```bash
-uv add git+https://github.com/beatrice-b-m/mg-aligner.git
+pip install "mg-aligner @ git+https://github.com/beatrice-b-m/mg-aligner.git@v0.1.0"
 ```
 
-or with pip:
+or, with uv:
 
 ```bash
-pip install git+https://github.com/beatrice-b-m/mg-aligner.git
+uv add "mg-aligner @ git+https://github.com/beatrice-b-m/mg-aligner.git@v0.1.0"
 ```
 
-The library has no runtime dependencies. Images are expected to be NumPy-style
-arrays.
+## Quick start
 
-## Usage
-
-An `Alignment` records which image edge holds the **chest wall** and which holds
-the **superior** side of the breast (the lateral side for CC views). The
-reference alignment is chest wall on the left, superior/lateral at the top.
+`Alignment.from_metadata` takes a pydicom `Dataset`, a dict, or a pandas row
+(for example from the EMBED metadata table):
 
 ```python
-import pydicom
+import ast
+import pandas as pd
 from mg_aligner import Alignment
 
-ds = pydicom.dcmread("image.dcm")
-alignment = Alignment.from_metadata(ds)   # also accepts a dict or pandas row
+meta = pd.read_csv("embed_metadata.csv")  # any table with DICOM attributes as columns
 
-alignment.is_known       # False if the metadata does not determine it
-alignment.is_reference   # True if no flip is needed
+for _, row in meta.iterrows():
+    alignment = Alignment.from_metadata(row)
+    if not alignment.is_known:
+        continue  # the metadata does not determine the orientation
 
-image = alignment.realign_image(ds.pixel_array)
-box = alignment.realign_box(roi, height=ds.Rows, width=ds.Columns)
+    image = load_pixels(row)  # your loader, e.g. pydicom.dcmread(path).pixel_array
+    h, w = image.shape[-2:]
+    aligned = alignment.realign_image(image)
+
+    # EMBED stores ROI_coords as a serialized list of boxes
+    rois = ast.literal_eval(row["ROI_coords"]) if isinstance(row["ROI_coords"], str) else []
+    aligned_rois = alignment.realign_boxes(rois, height=h, width=w)
 ```
 
-### Constructors
+[`examples/realign_synthetic.py`](examples/realign_synthetic.py) runs the same
+steps on a 4 × 6 array, so you can see the result:
 
-| Method | Uses |
+```text
+Stored as: chest wall right, superior bottom
+Aligned image (chest wall left, lateral top):
+[[9 9 1 1 0 0]
+ [9 9 1 1 1 0]
+ [1 1 1 1 0 0]
+ [1 1 1 0 0 0]]
+ROI: (2, 4, 3, 5) -> (0, 0, 1, 1)
+ROI mapped back: (2, 4, 3, 5)
+```
+
+## The reference frame
+
+An `Alignment` records two image edges: the one holding the **chest wall** and
+the one holding the **superior** side of the breast. CC-type views have no
+superior/inferior axis, so for them the `superior` edge holds the **lateral**
+side instead. The reference frame, `Alignment.reference()`, is chest wall on
+the left and superior (lateral for CC) at the top.
+
+## How the orientation is inferred
+
+`from_metadata` reads Patient Orientation from the first of sources 1–3 that
+has it, and falls back to source 4 if that does not give a known alignment:
+
+1. **Patient Orientation** (0020,0020), e.g. `P\L`. Each value is read by its
+   principal (first) letter: A/P place the chest wall and H/F the superior
+   side. Plain L/R values (CC-type views) also need the laterality, read from
+   `ImageLateralityFinal` (EMBED), `ImageLaterality`, or `Laterality`.
+2. For multi-frame objects such as DBT, Patient Orientation and Frame
+   Laterality in the shared or first per-frame **functional group**.
+3. If no Patient Orientation exists at all (e.g. GE Pristina DBT), it is
+   derived from **Image Orientation (Patient)** direction cosines.
+4. **Field of View Rotation and Horizontal Flip** (0018,7032 and 0018,7034).
+   These describe the image relative to the detector, so the result is
+   corrected for the vendor (GE detectors are rotated 180° relative to
+   Hologic) and for reverse views (LM, LMO, LMID, FB, SIO). Only Hologic and
+   GE, and the views checked on EMBED, are supported.
+
+If none of these works, the result is an unknown alignment (`is_known` is
+`False`); missing or malformed metadata never raises. Each source has its own
+constructor if you want to bypass the fallback:
+
+| Constructor | Input |
 | --- | --- |
-| `Alignment.from_metadata(record)` | Patient Orientation, falling back to Field of View attributes. Reads `ImageLateralityFinal` (EMBED), `ImageLaterality`, or `Laterality`. For multi-frame objects such as DBT, it also reads Patient Orientation and Frame Laterality from the functional groups when the top-level attributes are missing. If there is no Patient Orientation at all (e.g. GE Pristina DBT), it is derived from Image Orientation (Patient). |
-| `Alignment.from_orientation(orientation, laterality)` | DICOM Patient Orientation, e.g. `["P", "L"]`, `"P\\L"`, or `"['P', 'L']"`, read by each value's principal (first) letter. Laterality is only needed for plain L/R values (CC-type views). |
-| `Alignment.from_fov(rotation, horizontal_flip, laterality, view_position, manufacturer)` | DICOM Field of View Rotation (0 or 180) and Horizontal Flip. These describe the image relative to the detector, so the result is corrected for the vendor (GE detectors are rotated 180° relative to Hologic) and for reverse views (LM, LMO, LMID, FB, SIO). Unvalidated manufacturers and views give an unknown alignment. |
-| `Alignment(chest_wall, superior)` | Explicit edges, e.g. `Alignment("right", "top")`. |
+| `Alignment.from_orientation(orientation, laterality=None)` | Patient Orientation as `["P", "L"]`, `"P\\L"`, or `"['P', 'L']"` |
+| `Alignment.from_fov(rotation, horizontal_flip, laterality, view_position, manufacturer)` | Field of View attributes |
+| `Alignment(chest_wall, superior)` | Explicit edges, e.g. `Alignment("right", "top")` |
 
-Missing or malformed metadata gives an unknown alignment rather than an error.
-
-### Realignment
+## Realignment
 
 `realign_image`, `realign_point`, `realign_box`, and `realign_boxes` move an
-image or coordinates into the reference alignment, or into any `target=`
-alignment, so the same calls map results back into the original frame. The
-`height` and `width` passed are always those of the image the coordinates are
-on:
+image or coordinates into the reference frame, or into any other alignment
+passed as `target=`. Mapping results back into the stored frame (for example,
+model predictions) is the same call from the reference side:
 
 ```python
-h, w = image.shape[-2:]
-aligned = alignment.realign_image(image)
-aligned_box = alignment.realign_box(box, height=h, width=w)
 original_box = Alignment.reference().realign_box(
-    aligned_box, height=aligned.shape[-2], width=aligned.shape[-1], target=alignment
+    aligned_rois[0], height=aligned.shape[-2], width=aligned.shape[-1], target=alignment
 )
 ```
 
-- Images: the last two axes are (rows, columns), so 2D images and DBT volumes
-  shaped (frames, rows, columns) both work. Frame indices are unchanged.
-- Coordinates are inclusive pixel indices: points are `(y, x)` and boxes are
-  `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
-- Most images only need flips. An image stored a quarter turn from the target
-  (chest wall at the top or bottom) is also transposed, which swaps its rows and
-  columns, so the realigned image has shape (..., columns, rows).
+- **Coordinates are `(y, x)`**, i.e. (row, column) inclusive pixel indices.
+  Boxes are `(y_min, x_min, y_max, x_max)`, matching EMBED `ROI_coords`.
+- `height` and `width` are always those of the image the coordinates are
+  currently on.
+- The last two image axes are (rows, columns), so 2D images and DBT volumes
+  shaped (frames, rows, columns) both work. Frame order is unchanged.
+- An image stored a quarter turn off (chest wall at the top or bottom) is
+  transposed as well as flipped, so its realigned shape is
+  (..., columns, rows).
 - Realigning an unknown alignment raises `ValueError`.
+- `realign_image` returns a NumPy view, not a copy. Views from flips have
+  negative strides, which `torch.from_numpy` rejects: wrap the result in
+  `np.ascontiguousarray` first. Pass NumPy arrays, not torch tensors, since
+  torch does not support reversed slicing.
 
-See [`examples/realign_synthetic.py`](examples/realign_synthetic.py) for a
-runnable walk-through.
+The library only reorients. Pixel spacing, cropping, intensity inversion
+(MONOCHROME1), and windowing are left to your pipeline.
 
 ## Validation
 
-[`validation/embed_metadata.py`](validation/embed_metadata.py) checks the two
-metadata routes against each other on an EMBED image-metadata CSV
-(`metadata_all_cohorts_v1c`). For each 2D, 3D, and C-View image, it infers the
-alignment from Patient Orientation and from the Field of View attributes, then
-reports agreement by manufacturer, model, image type, and view. It also lists
-the input values behind any disagreement or unknown result. Output is
-aggregate counts only.
+The [`validation/`](validation/) folder holds the checks used on EMBED; both
+need EMBED access. `embed_metadata.py` infers each image's alignment from
+Patient Orientation and from Field of View and reports agreement by
+manufacturer, model, image type, and view (aggregate counts only).
+`visual_spot_check.ipynb` shows sampled images as stored and realigned, with
+the edges the metadata claims and the ROI boxes.
 
 ```bash
-uv run --group validation python validation/embed_metadata.py \
-    path/to/metadata_all_cohorts_v1c.csv --out validation_results/
+uv run --group validation python validation/embed_metadata.py path/to/metadata.csv
 ```
 
-[`validation/visual_spot_check.ipynb`](validation/visual_spot_check.ipynb)
-checks the pixels themselves. It samples a few images at random from each
-manufacturer, image type, and view, and shows each one as stored, marking the
-edges the metadata claims, next to its realigned version with the ROI boxes.
-Set the paths in its first code cell, then run it with the `validation`
-environment (`uv sync --group validation`). Its outputs contain patient
-images, so clear them before committing.
+## License
 
-## Development
-
-The project uses [`uv`](https://docs.astral.sh/uv/).
-
-```bash
-uv sync
-uv run pytest
-```
+Apache 2.0.

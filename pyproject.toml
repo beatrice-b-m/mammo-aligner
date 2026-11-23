@@ -5,8 +5,13 @@ description = "Check and realign the orientation of mammography images and coord
 authors = [
     { name = "Beatrice Brown-Mulry", email = "bbrownmulry@gmail.com" }
 ]
+readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/beatrice-b-m/mg-aligner"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
