@@ -37,7 +37,7 @@ uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0
 
 ```python
 import pydicom
-from mg_aligner import Alignment
+from mammo_aligner import Alignment
 
 ds = pydicom.dcmread("image.dcm")
 rois = ... # nested [[y_min, x_min, y_max, x_max], [...]] or single [y_min, x_min, y_max, x_max]
