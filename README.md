@@ -36,37 +36,18 @@ uv add "mammo-aligner @ git+https://github.com/beatrice-b-m/mammo-aligner.git@v0
 (for example from the EMBED metadata table):
 
 ```python
-import ast
-import pandas as pd
-from mammo_aligner import Alignment
+import pydicom
+from mg_aligner import Alignment
 
-meta = pd.read_csv("embed_metadata.csv")  # any table with DICOM attributes as columns
+ds = pydicom.dcmread("image.dcm")
+rois = ... # nested [[y_min, x_min, y_max, x_max], [...]] or single [y_min, x_min, y_max, x_max]
 
-for _, row in meta.iterrows():
-    alignment = Alignment.from_metadata(row)
-    if not alignment.is_known:
-        continue  # the metadata does not determine the orientation
+alignment = Alignment.from_metadata(ds)   # also accepts a dict or pandas row
+alignment.is_known       # False if the metadata does not determine it
+alignment.is_reference   # True if no flip is needed
 
-    image = load_pixels(row)  # your loader, e.g. pydicom.dcmread(path).pixel_array
-    aligned = alignment.realign_image(image)
-
-    # EMBED stores ROI_coords as a serialized list of boxes, in pixel indices
-    rois = ast.literal_eval(row["ROI_coords"]) if isinstance(row["ROI_coords"], str) else []
-    aligned_rois = alignment.realign_box(rois, size=image.shape[-2:])
-```
-
-[`examples/realign_synthetic.py`](examples/realign_synthetic.py) runs the same
-steps on a 4 × 6 array, so you can see the result:
-
-```text
-Stored as: chest wall right, superior bottom
-Aligned image (chest wall left, lateral top):
-[[9 9 1 1 0 0]
- [9 9 1 1 1 0]
- [1 1 1 1 0 0]
- [1 1 1 0 0 0]]
-ROI: (2, 4, 3, 5) -> (0, 0, 1, 1)
-ROI mapped back: (2, 4, 3, 5)
+aligned_image = alignment.realign_image(ds.pixel_array)
+aligned_rois = alignment.realign_box(rois, size=ds.pixel_array.shape[-2:])
 ```
 
 ## The reference frame
